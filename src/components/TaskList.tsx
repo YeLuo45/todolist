@@ -1,31 +1,43 @@
 import { useEffect, useState } from 'react'
 import useTaskStore from '../store/taskStore'
 import { smartSorter, type ScoredTask } from '../store/SmartSorter'
+import TagBadgeList from './TagBadgeList'
 
-export default function TaskList() {
+interface Props {
+  filterTags?: string[]
+}
+
+export default function TaskList({ filterTags = [] }: Props) {
   const tasks = useTaskStore(s => s.tasks)
   const completeTask = useTaskStore(s => s.completeTask)
   const deleteTask = useTaskStore(s => s.deleteTask)
   const subscribe = useTaskStore(s => s.subscribe)
   const [scoredTasks, setScoredTasks] = useState<ScoredTask[]>([])
 
-  // Subscribe to TaskBus events to re-sort when tasks change
   useEffect(() => {
     const unsubscribe = subscribe(() => {
       setScoredTasks(smartSorter.processTasks(tasks))
     })
-    // Initial sort
     setScoredTasks(smartSorter.processTasks(tasks))
     return unsubscribe
   }, [tasks, subscribe])
 
-  if (tasks.length === 0) {
-    return <div className="task-list empty">暂无任务</div>
+  // Filter by active tags
+  const filteredTasks = filterTags.length > 0
+    ? scoredTasks.filter(({ task }) =>
+        filterTags.every(tagId => task.tags.includes(tagId))
+      )
+    : scoredTasks
+
+  if (filteredTasks.length === 0) {
+    return <div className="task-list empty">
+      {filterTags.length > 0 ? '没有匹配标签的任务' : '暂无任务'}
+    </div>
   }
 
   return (
     <div className="task-list">
-      {scoredTasks.map(({ task, priorityScore, overdueDays }) => (
+      {filteredTasks.map(({ task, priorityScore, overdueDays }) => (
         <div key={task.id} className={`task-item task-item--${task.priority}`}>
           <input
             type="checkbox"
@@ -37,6 +49,7 @@ export default function TaskList() {
             <span className={task.status === 'completed' ? 'completed' : ''}>
               {task.title}
             </span>
+            <TagBadgeList task={task} />
             {task.dueDate && (
               <span className={`task-item__due ${overdueDays > 0 ? 'overdue' : ''}`}>
                 {new Date(task.dueDate).toLocaleDateString()}

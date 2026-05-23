@@ -1,9 +1,19 @@
+import { useState } from 'react'
 import TaskInput from './components/TaskInput'
 import TaskList from './components/TaskList'
 import FilterBar from './components/FilterBar'
+import TagFilter from './components/TagFilter'
 import './App.css'
 
 function App() {
+  const [activeTags, setActiveTags] = useState<string[]>([])
+
+  const toggleTag = (tagId: string) => {
+    setActiveTags(prev =>
+      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+    )
+  }
+
   return (
     <div className="app">
       <header className="app-header">
@@ -12,8 +22,9 @@ function App() {
       </header>
       <main className="app-main">
         <FilterBar />
+        <TagFilter activeTags={activeTags} onToggle={toggleTag} />
         <TaskInput />
-        <TaskList />
+        <TaskList filterTags={activeTags} />
       </main>
     </div>
   )

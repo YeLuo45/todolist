@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { PRESET_SCENES, applyPreset, type PresetScene } from '../store/PresetScenes'
+import { PRESET_SCENES, applyPreset } from '../store/PresetScenes'
 
 describe('PresetScenes', () => {
   describe('PRESET_SCENES', () => {

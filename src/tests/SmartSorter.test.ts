@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { SmartSorter, DEFAULT_WEIGHTS, type Task } from '../store/SmartSorter'
+import { SmartSorter, DEFAULT_WEIGHTS } from '../store/SmartSorter'
+import type { Task } from '../store/taskStore'
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -72,7 +73,6 @@ describe('SmartSorter', () => {
       const past = new Date()
       past.setDate(past.getDate() - 2)
       const task = makeTask({ dueDate: past.toISOString(), priority: 'high' })
-      // overdueDays=2, priority=3 (high), createdHours ~0
       const score = sorter.calculateScore(task)
       expect(score).toBeGreaterThan(0)
     })
