@@ -5,9 +5,12 @@ import TagBadgeList from './TagBadgeList'
 
 interface Props {
   filterTags?: string[]
+  batchMode?: boolean
+  selectedIds?: string[]
+  onToggleSelect?: (id: string) => void
 }
 
-export default function TaskList({ filterTags = [] }: Props) {
+export default function TaskList({ filterTags = [], batchMode = false, selectedIds = [], onToggleSelect }: Props) {
   const tasks = useTaskStore(s => s.tasks)
   const completeTask = useTaskStore(s => s.completeTask)
   const deleteTask = useTaskStore(s => s.deleteTask)
@@ -22,7 +25,6 @@ export default function TaskList({ filterTags = [] }: Props) {
     return unsubscribe
   }, [tasks, subscribe])
 
-  // Filter by active tags
   const filteredTasks = filterTags.length > 0
     ? scoredTasks.filter(({ task }) =>
         filterTags.every(tagId => task.tags.includes(tagId))
@@ -39,6 +41,13 @@ export default function TaskList({ filterTags = [] }: Props) {
     <div className="task-list">
       {filteredTasks.map(({ task, priorityScore, overdueDays }) => (
         <div key={task.id} className={`task-item task-item--${task.priority}`}>
+          {batchMode && (
+            <input
+              type="checkbox"
+              checked={selectedIds.includes(task.id)}
+              onChange={() => onToggleSelect && onToggleSelect(task.id)}
+            />
+          )}
           <input
             type="checkbox"
             checked={task.status === 'completed'}
@@ -65,7 +74,7 @@ export default function TaskList({ filterTags = [] }: Props) {
               {priorityScore > 0 ? `+${priorityScore.toFixed(0)}` : '0'}
             </span>
           )}
-          <button onClick={() => deleteTask(task.id)}>删除</button>
+          {!batchMode && <button onClick={() => deleteTask(task.id)}>删除</button>}
         </div>
       ))}
     </div>

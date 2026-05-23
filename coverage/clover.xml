@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<coverage generated="1779560984444" clover="3.2.0">
-  <project timestamp="1779560984444" name="All files">
-    <metrics statements="50" coveredstatements="50" conditionals="14" coveredconditionals="13" methods="30" coveredmethods="30" elements="94" coveredelements="93" complexity="0" loc="50" ncloc="50" packages="1" files="3" classes="3"/>
+<coverage generated="1779561291730" clover="3.2.0">
+  <project timestamp="1779561291730" name="All files">
+    <metrics statements="80" coveredstatements="80" conditionals="26" coveredconditionals="25" methods="60" coveredmethods="60" elements="166" coveredelements="165" complexity="0" loc="80" ncloc="80" packages="1" files="4" classes="4"/>
     <file name="PresetScenes.ts" path="/home/hermes/projects/todolist/src/store/PresetScenes.ts">
       <metrics statements="3" coveredstatements="3" conditionals="2" coveredconditionals="2" methods="2" coveredmethods="2"/>
       <line num="16" count="1" type="stmt"/>
@@ -60,6 +60,39 @@
       <line num="90" count="2" type="stmt"/>
       <line num="91" count="2" type="cond" truecount="2" falsecount="0"/>
       <line num="92" count="2" type="stmt"/>
+    </file>
+    <file name="taskStore.ts" path="/home/hermes/projects/todolist/src/store/taskStore.ts">
+      <metrics statements="30" coveredstatements="30" conditionals="12" coveredconditionals="12" methods="30" coveredmethods="30"/>
+      <line num="43" count="1" type="stmt"/>
+      <line num="45" count="1" type="stmt"/>
+      <line num="47" count="1" type="stmt"/>
+      <line num="52" count="44" type="stmt"/>
+      <line num="56" count="6" type="stmt"/>
+      <line num="57" count="6" type="stmt"/>
+      <line num="58" count="1" type="stmt"/>
+      <line num="63" count="26" type="stmt"/>
+      <line num="64" count="26" type="stmt"/>
+      <line num="69" count="26" type="stmt"/>
+      <line num="70" count="26" type="stmt"/>
+      <line num="71" count="26" type="stmt"/>
+      <line num="75" count="2" type="stmt"/>
+      <line num="77" count="2" type="cond" truecount="2" falsecount="0"/>
+      <line num="80" count="2" type="stmt"/>
+      <line num="81" count="2" type="cond" truecount="2" falsecount="0"/>
+      <line num="85" count="3" type="stmt"/>
+      <line num="86" count="3" type="stmt"/>
+      <line num="90" count="4" type="stmt"/>
+      <line num="92" count="4" type="cond" truecount="2" falsecount="0"/>
+      <line num="97" count="4" type="stmt"/>
+      <line num="98" count="4" type="cond" truecount="2" falsecount="0"/>
+      <line num="102" count="3" type="stmt"/>
+      <line num="103" count="3" type="stmt"/>
+      <line num="105" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="110" count="3" type="stmt"/>
+      <line num="111" count="9" type="stmt"/>
+      <line num="112" count="6" type="cond" truecount="2" falsecount="0"/>
+      <line num="117" count="6" type="stmt"/>
+      <line num="118" count="6" type="stmt"/>
     </file>
   </project>
 </coverage>

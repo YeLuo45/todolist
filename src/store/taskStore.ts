@@ -28,6 +28,9 @@ interface TaskState {
   updateTask: (id: string, updates: Partial<Task>) => void
   deleteTask: (id: string) => void
   completeTask: (id: string) => void
+  // Batch operations
+  batchComplete: (ids: string[]) => void
+  batchDelete: (ids: string[]) => void
 }
 
 export type TaskEvent =
@@ -93,6 +96,26 @@ const useTaskStore = create<TaskState>()(
         }))
         const task = get().tasks.find(t => t.id === id)
         if (task) get().publish({ type: 'TASK_COMPLETED', taskId: id, task })
+      },
+
+      batchComplete: (ids) => {
+        const now = new Date().toISOString()
+        set(state => ({
+          tasks: state.tasks.map(t =>
+            ids.includes(t.id)
+              ? { ...t, status: 'completed' as TaskStatus, completedAt: now }
+              : t
+          ),
+        }))
+        ids.forEach(id => {
+          const task = get().tasks.find(t => t.id === id)
+          if (task) get().publish({ type: 'TASK_COMPLETED', taskId: id, task })
+        })
+      },
+
+      batchDelete: (ids) => {
+        set(state => ({ tasks: state.tasks.filter(t => !ids.includes(t.id)) }))
+        ids.forEach(id => get().publish({ type: 'TASK_DELETED', taskId: id }))
       },
     }),
     {
