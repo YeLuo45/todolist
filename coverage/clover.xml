@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<coverage generated="1779560558415" clover="3.2.0">
+  <project timestamp="1779560558415" name="All files">
+    <metrics statements="32" coveredstatements="32" conditionals="7" coveredconditionals="7" methods="16" coveredmethods="16" elements="55" coveredelements="55" complexity="0" loc="32" ncloc="32" packages="1" files="2" classes="2"/>
+    <file name="PresetScenes.ts" path="/home/hermes/projects/todolist/src/store/PresetScenes.ts">
+      <metrics statements="3" coveredstatements="3" conditionals="2" coveredconditionals="2" methods="2" coveredmethods="2"/>
+      <line num="16" count="1" type="stmt"/>
+      <line num="41" count="4" type="stmt"/>
+      <line num="42" count="2" type="cond" truecount="2" falsecount="0"/>
+    </file>
+    <file name="SmartSorter.ts" path="/home/hermes/projects/todolist/src/store/SmartSorter.ts">
+      <metrics statements="29" coveredstatements="29" conditionals="5" coveredconditionals="5" methods="14" coveredmethods="14"/>
+      <line num="21" count="1" type="stmt"/>
+      <line num="27" count="1" type="stmt"/>
+      <line num="35" count="14" type="stmt"/>
+      <line num="38" count="14" type="stmt"/>
+      <line num="42" count="1" type="stmt"/>
+      <line num="46" count="2" type="stmt"/>
+      <line num="50" count="2" type="stmt"/>
+      <line num="54" count="1" type="stmt"/>
+      <line num="58" count="3" type="stmt"/>
+      <line num="66" count="7" type="stmt"/>
+      <line num="67" count="7" type="stmt"/>
+      <line num="68" count="7" type="stmt"/>
+      <line num="70" count="7" type="stmt"/>
+      <line num="81" count="16" type="cond" truecount="2" falsecount="0"/>
+      <line num="82" count="13" type="stmt"/>
+      <line num="83" count="13" type="stmt"/>
+      <line num="84" count="13" type="stmt"/>
+      <line num="85" count="13" type="stmt"/>
+      <line num="86" count="13" type="stmt"/>
+      <line num="93" count="7" type="stmt"/>
+      <line num="94" count="7" type="stmt"/>
+      <line num="95" count="7" type="stmt"/>
+      <line num="102" count="3" type="stmt"/>
+      <line num="103" count="4" type="stmt"/>
+      <line num="108" count="2" type="stmt"/>
+      <line num="116" count="2" type="cond" truecount="2" falsecount="0"/>
+      <line num="118" count="2" type="stmt"/>
+      <line num="124" count="1" type="stmt"/>
+      <line num="129" count="1" type="stmt"/>
+    </file>
+  </project>
+</coverage>
