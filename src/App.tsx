@@ -1,5 +1,6 @@
 import TaskInput from './components/TaskInput'
 import TaskList from './components/TaskList'
+import FilterBar from './components/FilterBar'
 import './App.css'
 
 function App() {
@@ -10,6 +11,7 @@ function App() {
         <p className="tagline">离线优先 · 事件总线 · nanobot风格</p>
       </header>
       <main className="app-main">
+        <FilterBar />
         <TaskInput />
         <TaskList />
       </main>
