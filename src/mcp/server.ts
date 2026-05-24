@@ -9,7 +9,6 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { allTools, toolsByName } from './tools'
-import type { McpRequest } from './types'
 
 // Initialize the MCP server
 const server = new Server(

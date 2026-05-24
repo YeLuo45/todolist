@@ -3,12 +3,9 @@
  * Implements 7 tools: list-tasks, create-task, update-task, delete-task, complete-task, query-by-tag, get-task
  */
 
-import { McpTool, Task, TaskStatus, TaskPriority } from './types'
 import { messageBus, MessageTypes } from '../db/messageBus'
-import { execQuery, getOne } from '../db/index'
-
-// Re-export types for use in tools
-export type { Task, TaskStatus, TaskPriority } from './types'
+import { execQuery } from '../db/index'
+import type { Task, TaskStatus, TaskPriority, McpTool } from './types'
 
 // SQL row to Task object (same as taskStore)
 function rowToTask(row: Record<string, unknown>): Task {
@@ -50,7 +47,7 @@ export const listTasksTool: McpTool = {
       },
     },
   },
-  handler: async (args?: { status?: string; priority?: string; tag?: string }) => {
+  handler: async (args?: Record<string, unknown>) => {
     let sql = 'SELECT * FROM tasks WHERE 1=1'
     const params: unknown[] = []
 
@@ -71,7 +68,7 @@ export const listTasksTool: McpTool = {
 
     // Filter by tag if specified (client-side tag filtering)
     if (args?.tag) {
-      tasks = tasks.filter(t => t.tags.includes(args.tag))
+      tasks = tasks.filter(t => t.tags.includes(args.tag as string))
     }
 
     return {
@@ -120,32 +117,32 @@ export const createTaskTool: McpTool = {
     },
     required: ['title'],
   },
-  handler: async (args: {
-    title: string
-    description?: string
-    priority?: 'low' | 'medium' | 'high'
-    dueDate?: string
-    tags?: string[]
-  }) => {
+  handler: async (args?: Record<string, unknown>) => {
+    if (!args?.title) {
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'Title is required' }, null, 2) }],
+        isError: true,
+      }
+    }
+
+    const { runQuery } = await import('../db/index')
     const id = `task-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
     const now = new Date().toISOString()
     const status: TaskStatus = 'pending'
-    const priority: TaskPriority = args.priority || 'medium'
+    const priority: TaskPriority = (args.priority as TaskPriority) || 'medium'
 
     const task: Task = {
       id,
-      title: args.title,
-      description: args.description || '',
+      title: args.title as string,
+      description: (args.description as string) || '',
       status,
       priority,
-      dueDate: args.dueDate,
+      dueDate: args.dueDate as string | undefined,
       createdAt: now,
       completedAt: undefined,
-      tags: args.tags || [],
+      tags: (args.tags as string[]) || [],
     }
 
-    // Insert into SQLite via runQuery (need to import runQuery)
-    const { runQuery } = await import('../db/index')
     runQuery(
       `INSERT INTO tasks (id, title, description, status, priority, due_date, created_at, completed_at, tags)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -162,7 +159,6 @@ export const createTaskTool: McpTool = {
       ]
     )
 
-    // Publish to messageBus to sync UI
     const msg = {
       type: MessageTypes.TASK_ADDED,
       payload: { taskId: id, task },
@@ -171,12 +167,7 @@ export const createTaskTool: McpTool = {
     messageBus.publish(msg)
 
     return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({ success: true, task }, null, 2),
-        },
-      ],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, task }, null, 2) }],
     }
   },
 }
@@ -190,100 +181,53 @@ export const updateTaskTool: McpTool = {
   inputSchema: {
     type: 'object',
     properties: {
-      id: {
-        type: 'string',
-        description: 'Task ID (required)',
-      },
-      title: {
-        type: 'string',
-        description: 'New title',
-      },
-      description: {
-        type: 'string',
-        description: 'New description',
-      },
-      priority: {
-        type: 'string',
-        enum: ['low', 'medium', 'high'],
-        description: 'New priority',
-      },
-      dueDate: {
-        type: 'string',
-        description: 'New due date in ISO format',
-      },
-      tags: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'New list of tags',
-      },
+      id: { type: 'string', description: 'Task ID (required)' },
+      title: { type: 'string', description: 'New title' },
+      description: { type: 'string', description: 'New description' },
+      priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'New priority' },
+      dueDate: { type: 'string', description: 'New due date in ISO format' },
+      tags: { type: 'array', items: { type: 'string' }, description: 'New list of tags' },
     },
     required: ['id'],
   },
-  handler: async (args: {
-    id: string
-    title?: string
-    description?: string
-    priority?: 'low' | 'medium' | 'high'
-    dueDate?: string
-    tags?: string[]
-  }) => {
-    const { runQuery: rq, getOne: go } = await import('../db/index')
+  handler: async (args?: Record<string, unknown>) => {
+    if (!args?.id) {
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'ID is required' }, null, 2) }],
+        isError: true,
+      }
+    }
 
-    // Get existing task
-    const existing = go<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [args.id])
+    const { runQuery: rq, getOne: go } = await import('../db/index')
+    const existing = go<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [args.id as string])
+
     if (!existing) {
       return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify({ success: false, error: 'Task not found' }, null, 2),
-          },
-        ],
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'Task not found' }, null, 2) }],
         isError: true,
       }
     }
 
     const updated: Task = {
       ...rowToTask(existing),
-      title: args.title ?? (existing.title as string),
-      description: args.description ?? (existing.description as string),
-      priority: args.priority ?? (existing.priority as TaskPriority),
-      dueDate: args.dueDate ?? (existing.due_date as string | undefined),
-      tags: args.tags ?? JSON.parse((existing.tags as string) || '[]'),
+      title: (args.title as string) ?? (existing.title as string),
+      description: (args.description as string) ?? (existing.description as string),
+      priority: (args.priority as TaskPriority) ?? (existing.priority as TaskPriority),
+      dueDate: (args.dueDate as string) ?? (existing.due_date as string | undefined),
+      tags: (args.tags as string[]) ?? JSON.parse((existing.tags as string) || '[]'),
     }
 
-    // Update SQLite
     rq(
-      `UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, due_date = ?, completed_at = ?, tags = ?
-       WHERE id = ?`,
-      [
-        updated.title,
-        updated.description,
-        updated.status,
-        updated.priority,
-        updated.dueDate || null,
-        updated.completedAt || null,
-        JSON.stringify(updated.tags),
-        args.id,
-      ]
+      `UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, due_date = ?, completed_at = ?, tags = ? WHERE id = ?`,
+      [updated.title, updated.description, updated.status, updated.priority, updated.dueDate || null, updated.completedAt || null, JSON.stringify(updated.tags), args.id]
     )
 
-    // Publish to messageBus
     const now = new Date().toISOString()
-    const msg = {
-      type: MessageTypes.TASK_UPDATED,
-      payload: { taskId: args.id, task: updated },
-      ts: now,
-    }
+    const msg = { type: MessageTypes.TASK_UPDATED, payload: { taskId: args.id, task: updated }, ts: now }
     messageBus.publish(msg)
 
     return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({ success: true, task: updated }, null, 2),
-        },
-      ],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, task: updated }, null, 2) }],
     }
   },
 }
@@ -296,50 +240,35 @@ export const deleteTaskTool: McpTool = {
   description: 'Delete a task by ID',
   inputSchema: {
     type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Task ID (required)',
-      },
-    },
+    properties: { id: { type: 'string', description: 'Task ID (required)' } },
     required: ['id'],
   },
-  handler: async (args: { id: string }) => {
-    const { runQuery: rq, getOne: go } = await import('../db/index')
-
-    // Check if task exists
-    const existing = go<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [args.id])
-    if (!existing) {
+  handler: async (args?: Record<string, unknown>) => {
+    if (!args?.id) {
       return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify({ success: false, error: 'Task not found' }, null, 2),
-          },
-        ],
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'ID is required' }, null, 2) }],
         isError: true,
       }
     }
 
-    // Delete from SQLite
+    const { runQuery: rq, getOne: go } = await import('../db/index')
+    const existing = go<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [args.id as string])
+
+    if (!existing) {
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'Task not found' }, null, 2) }],
+        isError: true,
+      }
+    }
+
     rq('DELETE FROM tasks WHERE id = ?', [args.id])
 
-    // Publish to messageBus
     const now = new Date().toISOString()
-    const msg = {
-      type: MessageTypes.TASK_DELETED,
-      payload: { taskId: args.id },
-      ts: now,
-    }
+    const msg = { type: MessageTypes.TASK_DELETED, payload: { taskId: args.id }, ts: now }
     messageBus.publish(msg)
 
     return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({ success: true }, null, 2),
-        },
-      ],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true }, null, 2) }],
     }
   },
 }
@@ -352,55 +281,38 @@ export const completeTaskTool: McpTool = {
   description: 'Mark a task as completed',
   inputSchema: {
     type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Task ID (required)',
-      },
-    },
+    properties: { id: { type: 'string', description: 'Task ID (required)' } },
     required: ['id'],
   },
-  handler: async (args: { id: string }) => {
-    const { runQuery: rq, getOne: go } = await import('../db/index')
+  handler: async (args?: Record<string, unknown>) => {
+    if (!args?.id) {
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'ID is required' }, null, 2) }],
+        isError: true,
+      }
+    }
 
-    // Get existing task
-    const existing = go<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [args.id])
+    const { runQuery: rq, getOne: go } = await import('../db/index')
+    const existing = go<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [args.id as string])
+
     if (!existing) {
       return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify({ success: false, error: 'Task not found' }, null, 2),
-          },
-        ],
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'Task not found' }, null, 2) }],
         isError: true,
       }
     }
 
     const now = new Date().toISOString()
-
-    // Update status to completed
     rq('UPDATE tasks SET status = ?, completed_at = ? WHERE id = ?', ['completed', now, args.id])
 
-    // Get updated task
     const updated = go<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [args.id])
     const task = updated ? rowToTask(updated) : null
 
-    // Publish to messageBus
-    const msg = {
-      type: MessageTypes.TASK_COMPLETED,
-      payload: { taskId: args.id, task },
-      ts: now,
-    }
+    const msg = { type: MessageTypes.TASK_COMPLETED, payload: { taskId: args.id, task }, ts: now }
     messageBus.publish(msg)
 
     return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({ success: true, task }, null, 2),
-        },
-      ],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, task }, null, 2) }],
     }
   },
 }
@@ -413,30 +325,23 @@ export const queryByTagTool: McpTool = {
   description: 'Query all tasks that have a specific tag',
   inputSchema: {
     type: 'object',
-    properties: {
-      tag: {
-        type: 'string',
-        description: 'Tag name to search for (required)',
-      },
-    },
+    properties: { tag: { type: 'string', description: 'Tag name to search for (required)' } },
     required: ['tag'],
   },
-  handler: async (args: { tag: string }) => {
-    const { execQuery: eq } = await import('../db/index')
+  handler: async (args?: Record<string, unknown>) => {
+    if (!args?.tag) {
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'Tag is required' }, null, 2) }],
+        isError: true,
+      }
+    }
 
-    // Get all tasks and filter by tag (since tags are stored as JSON)
+    const { execQuery: eq } = await import('../db/index')
     const rows = eq<Record<string, unknown>>('SELECT * FROM tasks ORDER BY created_at DESC')
-    const tasks = rows
-      .map(rowToTask)
-      .filter(t => t.tags.includes(args.tag))
+    const tasks = rows.map(rowToTask).filter(t => t.tags.includes(args.tag as string))
 
     return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({ tag: args.tag, tasks }, null, 2),
-        },
-      ],
+      content: [{ type: 'text' as const, text: JSON.stringify({ tag: args.tag, tasks }, null, 2) }],
     }
   },
 }
@@ -449,54 +354,38 @@ export const getTaskTool: McpTool = {
   description: 'Get a single task by its ID',
   inputSchema: {
     type: 'object',
-    properties: {
-      id: {
-        type: 'string',
-        description: 'Task ID (required)',
-      },
-    },
+    properties: { id: { type: 'string', description: 'Task ID (required)' } },
     required: ['id'],
   },
-  handler: async (args: { id: string }) => {
-    const { getOne: go } = await import('../db/index')
+  handler: async (args?: Record<string, unknown>) => {
+    if (!args?.id) {
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'ID is required' }, null, 2) }],
+        isError: true,
+      }
+    }
 
-    const row = go<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [args.id])
+    const { getOne: go } = await import('../db/index')
+    const row = go<Record<string, unknown>>('SELECT * FROM tasks WHERE id = ?', [args.id as string])
+
     if (!row) {
       return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify({ success: false, error: 'Task not found' }, null, 2),
-          },
-        ],
+        content: [{ type: 'text' as const, text: JSON.stringify({ success: false, error: 'Task not found' }, null, 2) }],
         isError: true,
       }
     }
 
     const task = rowToTask(row)
     return {
-      content: [
-        {
-          type: 'text' as const,
-          text: JSON.stringify({ success: true, task }, null, 2),
-        },
-      ],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, task }, null, 2) }],
     }
   },
 }
 
-// Export all tools as an array
 export const allTools: McpTool[] = [
-  listTasksTool,
-  createTaskTool,
-  updateTaskTool,
-  deleteTaskTool,
-  completeTaskTool,
-  queryByTagTool,
-  getTaskTool,
+  listTasksTool, createTaskTool, updateTaskTool, deleteTaskTool, completeTaskTool, queryByTagTool, getTaskTool,
 ]
 
-// Export tools by name for quick lookup
 export const toolsByName: Record<string, McpTool> = {
   'list-tasks': listTasksTool,
   'create-task': createTaskTool,
