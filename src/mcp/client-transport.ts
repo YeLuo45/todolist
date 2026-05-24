@@ -30,9 +30,7 @@ export function createStdioTransport(
  * @returns StreamableHTTPClientTransport instance
  */
 export function createHttpTransport(url: string): StreamableHTTPClientTransport {
-  return new StreamableHTTPClientTransport({
-    url,
-  })
+  return new StreamableHTTPClientTransport(new URL(url))
 }
 
 export default {
