@@ -274,7 +274,8 @@ export class TaskDependencyGraph {
    * Get tasks that will become runnable given a set of pending tasks
    */
   getNextRunnable(pendingTasks: Set<string>): string[] {
-    return this.getReadyTasks(new Set(this.allTasks).difference(pendingTasks))
+    const nonPending = new Set([...this.allTasks].filter(t => !pendingTasks.has(t)))
+    return this.getReadyTasks(nonPending)
   }
 
   /**

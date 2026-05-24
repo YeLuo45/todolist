@@ -1,19 +1,28 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ToolRegistry, getRegistry, resetRegistry, Role } from '../../mcp/registry';
-import { MessageBus } from '../../db/messageBus';
+import type { McpTool } from '../../mcp/types';
 
 describe('Permission Control', () => {
-  let messageBus: MessageBus;
   let registry: ToolRegistry;
 
   beforeEach(() => {
     resetRegistry();
-    messageBus = new MessageBus();
-    registry = getRegistry(messageBus);
+    registry = getRegistry();
+    // Register the 7 standard MCP tools with appropriate roles
+    const standardTools: Array<{ tool: McpTool; requiredRole: Role }> = [
+      { tool: makeTool('list-tasks'), requiredRole: 'reader' },
+      { tool: makeTool('create-task'), requiredRole: 'operator' },
+      { tool: makeTool('update-task'), requiredRole: 'operator' },
+      { tool: makeTool('delete-task'), requiredRole: 'admin' },
+      { tool: makeTool('complete-task'), requiredRole: 'operator' },
+      { tool: makeTool('query-by-tag'), requiredRole: 'reader' },
+      { tool: makeTool('get-task'), requiredRole: 'reader' },
+    ]
+    registry.registerAll(standardTools)
   });
 
   function callTool(toolName: string, role: Role): { success: boolean; error?: string } {
-    if (!registry.checkPermission(toolName, role)) {
+    if (!registry.hasPermission(toolName, role)) {
       return { success: false, error: 'Permission denied' };
     }
     return { success: true };
@@ -61,21 +70,30 @@ describe('Permission Control', () => {
     });
   });
 
-  describe('filterByRole', () => {
+  describe('getToolsByRole', () => {
     it('reader sees 3 read-only tools', () => {
-      const tools = registry.filterByRole('reader');
+      const tools = registry.getToolsByRole('reader');
       expect(tools.length).toBe(3);
       expect(tools.map(t => t.name).sort()).toEqual(['get-task', 'list-tasks', 'query-by-tag'].sort());
     });
 
-    it('operator sees 6 tools', () => {
-      const tools = registry.filterByRole('operator');
+    it('operator sees 6 tools (read + write except delete)', () => {
+      const tools = registry.getToolsByRole('operator');
       expect(tools.length).toBe(6);
     });
 
     it('admin sees all 7 tools', () => {
-      const tools = registry.filterByRole('admin');
+      const tools = registry.getToolsByRole('admin');
       expect(tools.length).toBe(7);
     });
   });
 });
+
+function makeTool(name: string, role: Role = 'operator'): McpTool {
+  return {
+    name,
+    description: `Mock tool: ${name}`,
+    inputSchema: { type: 'object', properties: {}, required: [] },
+    handler: async () => ({ content: [{ type: 'text' as const, text: '{}' }] }),
+  };
+}

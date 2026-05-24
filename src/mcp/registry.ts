@@ -64,10 +64,16 @@ export class ToolRegistry {
 
   /**
    * Get tools filtered by role (tools accessible to that role)
+   * Uses role hierarchy: admin > operator > reader
+   * A role can access tools registered with that role OR any lower role
    */
   getToolsByRole(role: Role): McpTool[] {
-    const allowedNames = TOOL_PERMISSIONS[role]
-    return this.listTools().filter(tool => allowedNames.includes(tool.name))
+    const roleLevel: Record<Role, number> = { reader: 0, operator: 1, admin: 2 }
+    return this.listTools().filter(tool => {
+      const required = this.toolRoles.get(tool.name)
+      if (!required) return false
+      return roleLevel[role] >= roleLevel[required]
+    })
   }
 
   /**
