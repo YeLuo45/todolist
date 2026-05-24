@@ -75,7 +75,7 @@ export const listTasksTool: McpTool = {
       content: [
         {
           type: 'text' as const,
-          text: JSON.stringify({ tasks }, null, 2),
+          text: JSON.stringify({ success: true, tasks }, null, 2),
         },
       ],
     }
@@ -341,7 +341,7 @@ export const queryByTagTool: McpTool = {
     const tasks = rows.map(rowToTask).filter(t => t.tags.includes(args.tag as string))
 
     return {
-      content: [{ type: 'text' as const, text: JSON.stringify({ tag: args.tag, tasks }, null, 2) }],
+      content: [{ type: 'text' as const, text: JSON.stringify({ success: true, tag: args.tag, tasks }, null, 2) }],
     }
   },
 }
