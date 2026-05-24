@@ -9,6 +9,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { allTools, toolsByName } from './tools'
+import { getRegistry } from './registry'
 
 // Initialize the MCP server
 const server = new Server(
@@ -23,10 +24,23 @@ const server = new Server(
   }
 )
 
-// Register the tools
+// Initialize registry with all tools
+const registry = getRegistry()
+registry.registerAll([
+  { tool: allTools.find(t => t.name === 'list-tasks')!, requiredRole: 'reader' },
+  { tool: allTools.find(t => t.name === 'create-task')!, requiredRole: 'operator' },
+  { tool: allTools.find(t => t.name === 'update-task')!, requiredRole: 'operator' },
+  { tool: allTools.find(t => t.name === 'delete-task')!, requiredRole: 'admin' },
+  { tool: allTools.find(t => t.name === 'complete-task')!, requiredRole: 'operator' },
+  { tool: allTools.find(t => t.name === 'query-by-tag')!, requiredRole: 'reader' },
+  { tool: allTools.find(t => t.name === 'get-task')!, requiredRole: 'reader' },
+])
+
+// Register the tools - expose via /tools/list endpoint using registry
 server.setRequestHandler(ListToolsRequestSchema, async () => {
+  const tools = registry.listTools()
   return {
-    tools: allTools.map(tool => ({
+    tools: tools.map(tool => ({
       name: tool.name,
       description: tool.description,
       inputSchema: tool.inputSchema,

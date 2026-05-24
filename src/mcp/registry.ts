@@ -1,152 +1,129 @@
-import { MessageBus } from '../db/messageBus';
+/**
+ * MCP Tool Registry
+ * Manages all MCP tools with role-based access control
+ */
 
-export type Role = 'admin' | 'operator' | 'reader';
+import type { McpTool } from './types'
 
-export interface ToolDescriptor {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  requiredRole: Role;
+export type Role = 'admin' | 'operator' | 'reader'
+
+// Permission matrix: which tools each role can access
+const TOOL_PERMISSIONS: Record<Role, string[]> = {
+  admin: ['list-tasks', 'create-task', 'update-task', 'delete-task', 'complete-task', 'query-by-tag', 'get-task'],
+  operator: ['list-tasks', 'create-task', 'update-task', 'complete-task', 'query-by-tag', 'get-task'],
+  reader: ['list-tasks', 'query-by-tag', 'get-task'],
+}
+
+// Role hierarchy: higher roles have more permissions
+const ROLE_ORDER: Record<Role, number> = {
+  reader: 0,
+  operator: 1,
+  admin: 2,
+}
+
+export interface ToolRegistration {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+  requiredRole: Role
 }
 
 export class ToolRegistry {
-  private tools: Map<string, ToolDescriptor> = new Map();
-  private messageBus: MessageBus;
+  private tools: Map<string, McpTool> = new Map()
+  private toolRoles: Map<string, Role> = new Map()
 
-  constructor(messageBus: MessageBus) {
-    this.messageBus = messageBus;
+  /**
+   * Register a tool with the registry
+   */
+  register(tool: McpTool, requiredRole: Role = 'operator'): void {
+    this.tools.set(tool.name, tool)
+    this.toolRoles.set(tool.name, requiredRole)
   }
 
-  register(tool: ToolDescriptor): void {
-    this.tools.set(tool.name, tool);
-  }
-
+  /**
+   * Unregister a tool by name
+   */
   unregister(name: string): void {
-    this.tools.delete(name);
+    this.tools.delete(name)
+    this.toolRoles.delete(name)
   }
 
-  list(): ToolDescriptor[] {
-    return Array.from(this.tools.values());
+  /**
+   * Get a specific tool by name
+   */
+  getTool(name: string): McpTool | undefined {
+    return this.tools.get(name)
   }
 
-  get(name: string): ToolDescriptor | undefined {
-    return this.tools.get(name);
+  /**
+   * List all registered tools
+   */
+  listTools(): McpTool[] {
+    return Array.from(this.tools.values())
   }
 
-  checkPermission(toolName: string, role: Role): boolean {
-    const tool = this.tools.get(toolName);
-    if (!tool) return false;
-    const roleOrder: Record<Role, number> = { reader: 0, operator: 1, admin: 2 };
-    return roleOrder[role] >= roleOrder[tool.requiredRole];
+  /**
+   * Get tools filtered by role (tools accessible to that role)
+   */
+  getToolsByRole(role: Role): McpTool[] {
+    const allowedNames = TOOL_PERMISSIONS[role]
+    return this.listTools().filter(tool => allowedNames.includes(tool.name))
   }
 
-  filterByRole(role: Role): ToolDescriptor[] {
-    return this.list().filter(t => this.checkPermission(t.name, role));
+  /**
+   * Get the inputSchema for a specific tool
+   */
+  getToolSchema(name: string): Record<string, unknown> | undefined {
+    const tool = this.tools.get(name)
+    return tool?.inputSchema ?? undefined
+  }
+
+  /**
+   * Check if a role has permission to use a specific tool
+   */
+  hasPermission(toolName: string, role: Role): boolean {
+    const requiredRole = this.toolRoles.get(toolName)
+    if (!requiredRole) return false
+    // Higher roles have more permissions - check role hierarchy
+    const roleOrder: Record<Role, number> = { reader: 0, operator: 1, admin: 2 }
+    return roleOrder[role] >= roleOrder[requiredRole]
+  }
+
+  /**
+   * Get the required role for a tool
+   */
+  getRequiredRole(toolName: string): Role | undefined {
+    return this.toolRoles.get(toolName)
+  }
+
+  /**
+   * Clear all registered tools (mainly for testing)
+   */
+  clear(): void {
+    this.tools.clear()
+    this.toolRoles.clear()
+  }
+
+  /**
+   * Register multiple tools at once
+   */
+  registerAll(tools: Array<{ tool: McpTool; requiredRole: Role }>): void {
+    for (const { tool, requiredRole } of tools) {
+      this.register(tool, requiredRole)
+    }
   }
 }
 
 // Singleton instance
-let _registry: ToolRegistry | null = null;
+let _instance: ToolRegistry | null = null
 
-export function getRegistry(messageBus: MessageBus): ToolRegistry {
-  if (!_registry) {
-    _registry = new ToolRegistry(messageBus);
-    _registry.register({
-      name: 'list-tasks',
-      description: '列出任务，支持分页和状态过滤',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          status: { type: 'string', enum: ['pending', 'completed'] },
-          page: { type: 'number', default: 1 },
-          pageSize: { type: 'number', default: 20 }
-        }
-      },
-      requiredRole: 'reader'
-    });
-    _registry.register({
-      name: 'create-task',
-      description: '创建新任务',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          title: { type: 'string' },
-          description: { type: 'string' },
-          priority: { type: 'number', enum: [1, 2, 3] },
-          tags: { type: 'array', items: { type: 'string' } }
-        },
-        required: ['title']
-      },
-      requiredRole: 'operator'
-    });
-    _registry.register({
-      name: 'update-task',
-      description: '更新任务内容',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' },
-          title: { type: 'string' },
-          description: { type: 'string' },
-          priority: { type: 'number', enum: [1, 2, 3] },
-          tags: { type: 'array', items: { type: 'string' } }
-        },
-        required: ['id']
-      },
-      requiredRole: 'operator'
-    });
-    _registry.register({
-      name: 'delete-task',
-      description: '删除任务',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' }
-        },
-        required: ['id']
-      },
-      requiredRole: 'admin'
-    });
-    _registry.register({
-      name: 'complete-task',
-      description: '标记任务为已完成',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' }
-        },
-        required: ['id']
-      },
-      requiredRole: 'operator'
-    });
-    _registry.register({
-      name: 'query-by-tag',
-      description: '按标签查询任务',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          tag: { type: 'string' }
-        },
-        required: ['tag']
-      },
-      requiredRole: 'reader'
-    });
-    _registry.register({
-      name: 'get-task',
-      description: '获取单个任务详情',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          id: { type: 'string' }
-        },
-        required: ['id']
-      },
-      requiredRole: 'reader'
-    });
+export function getRegistry(): ToolRegistry {
+  if (!_instance) {
+    _instance = new ToolRegistry()
   }
-  return _registry;
+  return _instance
 }
 
 export function resetRegistry(): void {
-  _registry = null;
+  _instance = null
 }
