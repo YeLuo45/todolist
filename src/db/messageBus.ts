@@ -136,4 +136,29 @@ export const MessageTypes = {
   TASK_UPDATED: 'TASK_UPDATED',
   TASK_DELETED: 'TASK_DELETED',
   TASK_COMPLETED: 'TASK_COMPLETED',
+  TAG_CREATED: 'TAG_CREATED',
+  TAG_UPDATED: 'TAG_UPDATED',
+  TAG_DELETED: 'TAG_DELETED',
+}
+
+/**
+ * Factory: create a task-related message
+ */
+export function createTaskMessage(type: string, taskId: string, extra: Record<string, unknown> = {}): InboundMessage {
+  return {
+    type,
+    payload: { taskId, ...extra },
+    ts: new Date().toISOString(),
+  }
+}
+
+/**
+ * Factory: create a tag-related message
+ */
+export function createTagMessage(type: string, tagId: string, extra: Record<string, unknown> = {}): InboundMessage {
+  return {
+    type,
+    payload: { tagId, ...extra },
+    ts: new Date().toISOString(),
+  }
 }
