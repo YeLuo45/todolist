@@ -13,6 +13,8 @@ import {
 import { createStdioTransport, createHttpTransport } from './client-transport.js'
 import type { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import { withRetry, DEFAULT_RETRY_CONFIG } from './retry'
+import type { RetryConfig } from './retry'
 
 export interface MCPClientConfig {
   name: string
@@ -81,9 +83,9 @@ export class MCPClient {
   }
 
   /**
-   * Connect using HTTP transport with a specific URL
+   * Connect using HTTP transport with a specific URL (with retry)
    */
-  async connectHttp(url: string): Promise<void> {
+  async connectHttp(url: string, retryConfig?: RetryConfig): Promise<void> {
     if (this.client) {
       await this.disconnect()
     }
@@ -94,7 +96,26 @@ export class MCPClient {
       version: '1.0.0',
     })
 
-    await this.client.connect(this.httpTransport)
+    await withRetry(
+      () => this.client!.connect(this.httpTransport),
+      retryConfig ?? DEFAULT_RETRY_CONFIG
+    )
+  }
+
+  /**
+   * Check if transport is healthy (basic connectivity check)
+   */
+  async healthCheck(): Promise<boolean> {
+    if (!this.client) return false
+    try {
+      await withRetry(
+        () => this.client!.request(ListToolsRequestSchema, {}),
+        { maxAttempts: 1, baseDelayMs: 0, maxDelayMs: 0 }
+      )
+      return true
+    } catch {
+      return false
+    }
   }
 
   /**
@@ -126,19 +147,23 @@ export class MCPClient {
   }
 
   /**
-   * Call a tool on the connected MCP server
+   * Call a tool on the connected MCP server (with retry)
    */
   async callTool(
     toolName: string,
-    args: Record<string, unknown>
+    args: Record<string, unknown>,
+    retryConfig?: RetryConfig
   ): Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> {
     if (!this.client) {
       throw new Error('Client not connected')
     }
 
-    const result = await this.client.request(
-      CallToolRequestSchema,
-      { name: toolName, arguments: args }
+    const result = await withRetry(
+      () => this.client!.request(
+        CallToolRequestSchema,
+        { name: toolName, arguments: args }
+      ),
+      retryConfig ?? DEFAULT_RETRY_CONFIG
     )
 
     return result as { content: Array<{ type: string; text: string }>; isError?: boolean }
