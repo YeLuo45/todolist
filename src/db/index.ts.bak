@@ -1,0 +1,121 @@
+/**
+ * sql.js Database initialization and connection management
+ */
+
+import initSqlJs, { Database } from 'sql.js'
+import { CREATE_TASKS_TABLE, CREATE_TAGS_TABLE, CREATE_SYNC_LOG_TABLE } from './schema'
+
+let db: Database | null = null
+let dbPromise: Promise<Database> | null = null
+
+export interface DbConfig {
+  location?: string // localStorage key for persistence
+}
+
+/**
+ * Initialize sql.js and open/create the database
+ */
+export async function initDatabase(config: DbConfig = {}): Promise<Database> {
+  if (db) return db
+
+  if (!dbPromise) {
+    dbPromise = (async () => {
+      const SQL = await initSqlJs({
+        // sql.js locateFile for the wasm file
+        locateFile: (file: string) => `https://sql.js.org/dist/${file}`,
+      })
+
+      const savedData = localStorage.getItem(config.location || 'todolist-sqlite-db')
+      if (savedData) {
+        const data = Uint8Array.from(atob(savedData), c => c.charCodeAt(0))
+        db = new SQL.Database(data)
+      } else {
+        db = new SQL.Database()
+      }
+
+      // Create tables if they don't exist
+      db.run(CREATE_TASKS_TABLE)
+      db.run(CREATE_TAGS_TABLE)
+      db.run(CREATE_SYNC_LOG_TABLE)
+
+      return db
+    })()
+  }
+
+  return dbPromise
+}
+
+/**
+ * Get the database instance (must call initDatabase first)
+ */
+export function getDatabase(): Database {
+  if (!db) {
+    throw new Error('Database not initialized. Call initDatabase() first.')
+  }
+  return db
+}
+
+/**
+ * Save database to localStorage for persistence
+ */
+export function persistDatabase(location?: string): void {
+  if (!db) return
+  const data = db.export()
+  const base64 = btoa(String.fromCharCode(...data))
+  localStorage.setItem(location || 'todolist-sqlite-db', base64)
+}
+
+/**
+ * Close the database connection
+ */
+export function closeDatabase(): void {
+  if (db) {
+    persistDatabase()
+    db.close()
+    db = null
+    dbPromise = null
+  }
+}
+
+/**
+ * Run a SQL query with parameters
+ */
+export function runQuery(sql: string, params: unknown[] = []): void {
+  const database = getDatabase()
+  database.run(sql, params)
+  persistDatabase()
+}
+
+/**
+ * Execute a SQL query and return all results
+ */
+export function execQuery<T>(sql: string, params: unknown[] = []): T[] {
+  const database = getDatabase()
+  const stmt = database.prepare(sql)
+  stmt.bind(params)
+  const results: T[] = []
+  while (stmt.step()) {
+    results.push(stmt.getAsObject() as T)
+  }
+  stmt.free()
+  return results
+}
+
+/**
+ * Get a single row
+ */
+export function getOne<T>(sql: string, params: unknown[] = []): T | undefined {
+  const results = execQuery<T>(sql, params)
+  return results[0]
+}
+
+/**
+ * Log an operation to the sync_log table
+ */
+export function logSync(op: string, entity: string, entityId: string): void {
+  const ts = new Date().toISOString()
+  runQuery(
+    'INSERT INTO sync_log (op, entity, entity_id, ts) VALUES (?, ?, ?, ?)',
+    [op, entity, entityId, ts]
+  )
+}
