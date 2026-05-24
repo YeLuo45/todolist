@@ -9,6 +9,7 @@ export interface PriorityWeights {
   overdueDays: number    // w1: 逾期天数权重
   priority: number       // w2: 优先级权重
   createdHours: number   // w3: 创建时间权重
+  deadline: number       // w4: 截止日期临近权重
 }
 
 export interface ScoredTask {
@@ -17,11 +18,14 @@ export interface ScoredTask {
   overdueDays: number
 }
 
+export type CustomScorer = (task: Task) => number
+
 // Default weights (nanobot-design inspired)
 export const DEFAULT_WEIGHTS: PriorityWeights = {
   overdueDays: 10,
   priority: 5,
   createdHours: 0.1,
+  deadline: 0,
 }
 
 const PRIORITY_WEIGHT_MAP: Record<TaskPriority, number> = {
@@ -122,6 +126,74 @@ export class SmartSorter {
       }))
     }
     return this.sortTasks(tasks)
+  }
+
+  /**
+   * Sort tasks by deadline proximity (most urgent first)
+   * Tasks without deadline are placed at the end
+   */
+  sortByDeadline(tasks: Task[], beforeDate: Date = new Date()): ScoredTask[] {
+    return tasks
+      .map(task => ({
+        task,
+        priorityScore: this.getDeadlineScore(task, beforeDate),
+        overdueDays: this.getOverdueDays(task),
+      }))
+      .sort((a, b) => {
+        // Tasks without deadline go last
+        if (a.task.dueDate === undefined && b.task.dueDate === undefined) return 0
+        if (a.task.dueDate === undefined) return 1
+        if (b.task.dueDate === undefined) return -1
+        return b.priorityScore - a.priorityScore  // descending: highest score first
+      })
+  }
+
+  /**
+   * Calculate deadline proximity score
+   * Higher score = more urgent (closer to deadline)
+   */
+  private getDeadlineScore(task: Task, beforeDate: Date): number {
+    if (!task.dueDate) return 0
+    const now = beforeDate.getTime()
+    const due = new Date(task.dueDate).getTime()
+    const diffHours = (due - now) / (1000 * 60 * 60)
+    // Score: high when within 48 hours, decreasing linearly
+    if (diffHours < 0) return 100 + Math.abs(diffHours) // Overdue: highest scores
+    if (diffHours > 48) return 0
+    return (48 - diffHours) * this.weights.deadline
+  }
+
+  /**
+   * Detect "unsorted zone" tasks - tasks with no tags and no category
+   * These tasks have nowhere to land in a organized task list
+   */
+  detectUnsortedZone(tasks: Task[]): Task[] {
+    return tasks.filter(task => {
+      const hasNoTags = !task.tags || task.tags.length === 0
+      const hasNoCategory = !task.category || task.category.trim() === ''
+      const hasNoPriority = !task.priority || task.priority === 'medium'
+      return hasNoTags && hasNoCategory && hasNoPriority
+    })
+  }
+
+  /**
+   * Update weights at runtime
+   */
+  updateWeights(weights: Partial<PriorityWeights>): void {
+    this.weights = { ...this.weights, ...weights }
+  }
+
+  /**
+   * Sort tasks using a custom scorer function
+   */
+  sortWithCustomScorer(tasks: Task[], scorer: CustomScorer): ScoredTask[] {
+    return tasks
+      .map(task => ({
+        task,
+        priorityScore: scorer(task),
+        overdueDays: this.getOverdueDays(task),
+      }))
+      .sort((a, b) => b.priorityScore - a.priorityScore)
   }
 }
 
